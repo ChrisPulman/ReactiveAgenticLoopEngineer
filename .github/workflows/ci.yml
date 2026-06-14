@@ -124,10 +124,28 @@ jobs:
         run: git-release-notes --release-version "${{ steps.nbgv.outputs.SemVer2 }}" --output-file release-notes.md
 
       - name: Publish to NuGet
+        shell: pwsh
         env:
           NUGET_AUTH_TOKEN: ${{ secrets.NUGET_API_KEY }}
           SOURCE_URL: https://api.nuget.org/v3/index.json
-        run: dotnet nuget push artifacts/*.nupkg --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_AUTH_TOKEN)) {
+            throw "NUGET_API_KEY is not configured for this repository or release environment."
+          }
+
+          $artifactPath = Resolve-Path -LiteralPath artifacts -ErrorAction SilentlyContinue
+          if (-not $artifactPath) {
+            throw "The artifacts directory was not downloaded."
+          }
+
+          $packages = Get-ChildItem -LiteralPath $artifactPath.Path -Filter '*.nupkg' -File
+          if (-not $packages) {
+            throw "No NuGet packages were found under $($artifactPath.Path)."
+          }
+
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName --api-key $env:NUGET_AUTH_TOKEN --source $env:SOURCE_URL --skip-duplicate
+          }
 
       - name: Create GitHub Release
         env:
