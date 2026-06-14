@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/Config/">
+    <File Path=".editorconfig" />
+    <File Path=".github/workflows/ci.yml" />
+    <File Path=".gitignore" />
+    <File Path="global.json" />
+    <File Path="images/rale-image.ico" />
+    <File Path="images/rale-image.png" />
+    <File Path="images/rale-package-icon.png" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="skills/RALE/SKILL.md" />
+    <File Path="testconfig.json" />
+    <File Path="version.json" />
+  </Folder>
+  <Folder Name="/src/">
+    <File Path="README.md" />
+    <Project Path="src/RALE.Server/RALE.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RALE.Tests/RALE.Tests.csproj" />
+  </Folder>
+</Solution>

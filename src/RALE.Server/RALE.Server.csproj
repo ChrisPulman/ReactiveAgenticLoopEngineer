@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CP.Reactive.Agentic.Loop.Engineer.MCP.Server</AssemblyName>
+    <RootNamespace>RALE.Server</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>CP.Reactive.Agentic.Loop.Engineer.MCP.Server</PackageId>
+    <Title>Reactive Agentic Loop Engineer MCP Server</Title>
+    <Description>Reactive Agentic Loop Engineer MCP server for persisted prompt loops, goal-bounded decomposition, pause/resume workflows, and SQLite-backed audit state.</Description>
+    <Authors>Chris Pulman</Authors>
+    <PackageProjectUrl>https://github.com/ChrisPulman/ReactiveAgenticLoopEngineer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ChrisPulman/ReactiveAgenticLoopEngineer</RepositoryUrl>
+    <PackageIcon>images/rale-package-icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>MCP;Model Context Protocol;C#;dotnet;agentic;reactive;ReactiveUI;SQLite;workflow;prompt-decomposition</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackAsTool>true</PackAsTool>
+    <PackageType>McpServer</PackageType>
+    <ToolCommandName>reactive-agentic-loop-engineer-mcp-server</ToolCommandName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="all" />
+    <PackageReference Include="ReactiveUI.Primitives" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="" Link="README.md" />
+    <None Include="..\..\.mcp\server.json" Pack="true" PackagePath=".mcp\server.json" Link=".mcp\server.json" />
+    <None Include="..\..\images\rale-image.ico" Pack="true" PackagePath="images/" Link="images\rale-image.ico" />
+    <None Include="..\..\images\rale-image.png" Pack="true" PackagePath="images/" Link="images\rale-image.png" />
+    <None Include="..\..\images\rale-package-icon.png" Pack="true" PackagePath="images/" Link="images\rale-package-icon.png" />
+    <None Include="..\..\skills\RALE\SKILL.md" Pack="true" PackagePath="skills\RALE\SKILL.md" Link="skills\RALE\SKILL.md" />
+  </ItemGroup>
+
+</Project>
