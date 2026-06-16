@@ -8,7 +8,7 @@ using ReactiveUI.Primitives.Signals;
 
 namespace RALE.Server.Services;
 
-public sealed class LoopEngineer(
+public sealed partial class LoopEngineer(
     IDbContextFactory<RALEContext> contextFactory,
     ILogger<LoopEngineer> logger) : ILoopEngineer
 {
@@ -146,6 +146,23 @@ public sealed class LoopEngineer(
         goal.CompletedAt = result.CompletedAt;
         goal.Version++;
 
+        if (goal.AssignedAgentId.HasValue)
+        {
+            var agent = await context.Agents
+                .FirstOrDefaultAsync(existing => existing.Id == goal.AssignedAgentId.Value, cancellationToken)
+                .ConfigureAwait(false);
+            if (agent is not null)
+            {
+                agent.CurrentLoad = Math.Max(0, agent.CurrentLoad - 1);
+                if (agent.AssignedGoalId == goal.Id)
+                {
+                    agent.AssignedGoalId = null;
+                }
+
+                agent.Version++;
+            }
+        }
+
         context.LoopEvents.Add(new LoopEvent
         {
             LoopId = goal.LoopId,
@@ -235,7 +252,7 @@ public sealed class LoopEngineer(
         }
         catch (DbUpdateConcurrencyException)
         {
-            logger.LogDebug("Goal {GoalId} claim lost an optimistic concurrency race.", goalId);
+            GoalClaimLost(logger, goalId);
             return false;
         }
     }
@@ -371,16 +388,15 @@ public sealed class LoopEngineer(
         }
 
         var statusById = loop.Goals.ToDictionary(goal => goal.Id, goal => goal.Status);
-        return loop.Goals
+        return [.. loop.Goals
             .Where(goal => goal.Status == GoalStatus.Pending && DependenciesComplete(goal, statusById))
-            .OrderBy(goal => goal.Sequence)
-            .ToArray();
+            .OrderBy(goal => goal.Sequence)];
     }
 
     private static async Task<bool> DependenciesCompleteAsync(RALEContext context, Goal goal, CancellationToken cancellationToken)
     {
         var dependencies = ParseDependencies(goal);
-        if (dependencies.Count == 0)
+        if (dependencies.Length == 0)
         {
             return true;
         }
@@ -390,10 +406,10 @@ public sealed class LoopEngineer(
             .CountAsync(existing => dependencies.Contains(existing.Id) && existing.Status == GoalStatus.Complete, cancellationToken)
             .ConfigureAwait(false);
 
-        return completedCount == dependencies.Count;
+        return completedCount == dependencies.Length;
     }
 
-    private static bool DependenciesComplete(Goal goal, IReadOnlyDictionary<Guid, GoalStatus> statusById)
+    private static bool DependenciesComplete(Goal goal, Dictionary<Guid, GoalStatus> statusById)
     {
         foreach (var dependency in ParseDependencies(goal))
         {
@@ -406,7 +422,7 @@ public sealed class LoopEngineer(
         return true;
     }
 
-    private static IReadOnlyList<Guid> ParseDependencies(Goal goal)
+    private static Guid[] ParseDependencies(Goal goal)
     {
         if (string.IsNullOrWhiteSpace(goal.DependsOnJson))
         {
@@ -415,6 +431,9 @@ public sealed class LoopEngineer(
 
         return JsonSerializer.Deserialize<Guid[]>(goal.DependsOnJson, JsonOptions) ?? [];
     }
+
+    [LoggerMessage(EventId = 1, Level = LogLevel.Debug, Message = "Goal {GoalId} claim lost an optimistic concurrency race.")]
+    private static partial void GoalClaimLost(ILogger logger, Guid goalId);
 
     private static async Task ReduceLoopStatusAsync(RALEContext context, Guid loopId, CancellationToken cancellationToken)
     {

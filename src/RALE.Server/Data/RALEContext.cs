@@ -11,6 +11,8 @@ public sealed class RALEContext(DbContextOptions<RALEContext> options) : DbConte
 
     public DbSet<Agent> Agents => Set<Agent>();
 
+    public DbSet<AgentEvent> AgentEvents => Set<AgentEvent>();
+
     public DbSet<GoalResult> GoalResults => Set<GoalResult>();
 
     public DbSet<LoopEvent> LoopEvents => Set<LoopEvent>();
@@ -25,6 +27,9 @@ public sealed class RALEContext(DbContextOptions<RALEContext> options) : DbConte
             entity.HasKey(loop => loop.Id);
             entity.Property(loop => loop.PrimaryObjective).IsRequired();
             entity.Property(loop => loop.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(loop => loop.ConstraintsJson).IsRequired();
+            entity.Property(loop => loop.RequiredArtifactsJson).IsRequired();
+            entity.Property(loop => loop.ExecutionPattern).IsRequired().HasMaxLength(32);
             entity.Property(loop => loop.Version).IsConcurrencyToken();
             entity.HasMany(loop => loop.Goals).WithOne(goal => goal.Loop).HasForeignKey(goal => goal.LoopId);
             entity.HasMany(loop => loop.Events).WithOne(loopEvent => loopEvent.Loop).HasForeignKey(loopEvent => loopEvent.LoopId);
@@ -38,9 +43,18 @@ public sealed class RALEContext(DbContextOptions<RALEContext> options) : DbConte
             entity.Property(goal => goal.Description).IsRequired().HasMaxLength(512);
             entity.Property(goal => goal.Prompt).IsRequired();
             entity.Property(goal => goal.DependsOnJson).IsRequired();
+            entity.Property(goal => goal.TaskType).IsRequired().HasMaxLength(128);
+            entity.Property(goal => goal.RequiredArtifactsJson).IsRequired();
+            entity.Property(goal => goal.ApprovalState).IsRequired().HasMaxLength(32);
+            entity.Property(goal => goal.PolicyState).IsRequired().HasMaxLength(32);
+            entity.Property(goal => goal.PolicyViolationsJson).IsRequired();
             entity.Property(goal => goal.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(goal => goal.Version).IsConcurrencyToken();
             entity.HasMany(goal => goal.Results).WithOne(result => result.Goal).HasForeignKey(result => result.GoalId);
+            entity.HasOne(goal => goal.AssignedAgent)
+                .WithMany()
+                .HasForeignKey(goal => goal.AssignedAgentId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Agent>(entity =>
@@ -49,10 +63,26 @@ public sealed class RALEContext(DbContextOptions<RALEContext> options) : DbConte
             entity.HasKey(agent => agent.Id);
             entity.Property(agent => agent.Name).IsRequired().HasMaxLength(128);
             entity.Property(agent => agent.Capabilities).IsRequired();
+            entity.Property(agent => agent.Endpoint).IsRequired().HasMaxLength(512);
+            entity.Property(agent => agent.SupportedTaskTypesJson).IsRequired();
+            entity.Property(agent => agent.Sla).IsRequired().HasMaxLength(128);
+            entity.Property(agent => agent.SecurityPosture).IsRequired().HasMaxLength(128);
+            entity.Property(agent => agent.ToolScopesJson).IsRequired();
+            entity.Property(agent => agent.CachedCapacityConstraintsJson).IsRequired();
+            entity.Property(agent => agent.Version).IsConcurrencyToken();
+            entity.HasMany(agent => agent.Events).WithOne(agentEvent => agentEvent.Agent).HasForeignKey(agentEvent => agentEvent.AgentId);
             entity.HasOne(agent => agent.AssignedGoal)
                 .WithMany()
                 .HasForeignKey(agent => agent.AssignedGoalId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AgentEvent>(entity =>
+        {
+            entity.ToTable("AgentEvents");
+            entity.HasKey(agentEvent => agentEvent.Id);
+            entity.Property(agentEvent => agentEvent.Type).HasConversion<string>().HasMaxLength(64);
+            entity.Property(agentEvent => agentEvent.Detail).IsRequired();
         });
 
         modelBuilder.Entity<GoalResult>(entity =>

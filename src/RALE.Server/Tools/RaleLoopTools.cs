@@ -57,7 +57,7 @@ public static class RaleLoopTools
         ArgumentNullException.ThrowIfNull(loopEngineer);
 
         var goals = await loopEngineer.ListGoalsAsync(loopId, cancellationToken).ConfigureAwait(false);
-        return goals.Select(goal => goal.ToDto()).ToArray();
+        return [.. goals.Select(goal => goal.ToDto())];
     }
 
     [McpServerTool(Name = "rale_claim_next_goal", Title = "Claim Next RALE Goal", Destructive = false, Idempotent = false, OpenWorld = false)]

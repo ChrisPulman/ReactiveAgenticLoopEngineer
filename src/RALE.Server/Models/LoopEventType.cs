@@ -11,5 +11,16 @@ public enum LoopEventType
     GoalFailed = 6,
     LoopPaused = 7,
     LoopResumed = 8,
-    LoopCompleted = 9
+    LoopCompleted = 9,
+    AgentRegistered = 10,
+    CapacityDiscovered = 11,
+    CapacityFallbackUsed = 12,
+    PlanDecomposed = 13,
+    GoalAssigned = 14,
+    ApprovalRequired = 15,
+    GoalApproved = 16,
+    GoalRejected = 17,
+    GoalHeartbeat = 18,
+    GoalResplit = 19,
+    PolicyViolation = 20
 }
