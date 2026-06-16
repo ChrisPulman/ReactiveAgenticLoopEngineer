@@ -12,12 +12,11 @@ public sealed partial class PromptDecomposer
         var normalized = Whitespace().Replace(primaryPrompt.Trim(), " ");
         var chunks = SplitIntoChunks(normalized, tokenLimit);
 
-        return chunks
+        return [.. chunks
             .Select((prompt, index) => new GoalDraft(
                 index + 1,
                 CreateDescription(index + 1, prompt),
-                prompt))
-            .ToArray();
+                prompt))];
     }
 
     public static int EstimateTokens(string value)
@@ -39,7 +38,7 @@ public sealed partial class PromptDecomposer
         }
     }
 
-    private static IReadOnlyList<string> SplitIntoChunks(string prompt, int limit)
+    private static List<string> SplitIntoChunks(string prompt, int limit)
     {
         if (prompt.Length <= limit)
         {

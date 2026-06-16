@@ -26,10 +26,15 @@ Click to install in your preferred environment:
 - Persisted loops, goals, agents, goal results, and append-only loop events.
 - A reactive `Signal<Goal>` pipeline for ready-goal emission.
 - Prompt decomposition that never emits a goal whose `Prompt.Length` exceeds the configured limit.
+- Agent-card registration with capabilities, capacity profile, trust posture, task types, SLA, endpoint, and least-privilege tool scopes.
+- On-demand capacity discovery through agent endpoints with TTL-based cache/profile fallback.
+- Master-plan decomposition into capacity-fit subtasks assigned to candidate agents with serial or parallel dependency graphs.
+- Governance gates for trust level, task type support, required tool scopes, and human approval.
+- Bounded reactive-loop recovery through heartbeats, iteration limits, and capacity-mismatch re-splitting.
 - Optimistic database concurrency for goal claiming so duplicate execution is rejected.
 - Goal pause/resume and complete/fail transitions.
-- MCP tools for loop creation, loop inspection, goal claiming, completion, pause, and resume.
-- TUnit tests covering decomposition, persistence, ready-goal emission, claiming, completion, and pause/resume.
+- MCP tools for loop creation, agent registration, capacity discovery, master-plan creation, dispatch, approval, completion, pause, resume, heartbeat, and re-splitting.
+- TUnit tests covering decomposition, persistence, ready-goal emission, claiming, completion, pause/resume, capacity fallback, governance, dispatch, and re-splitting.
 
 ## Repository Layout
 
@@ -44,9 +49,12 @@ src/RALE.Server/
   Services/
     LoopEngineer.cs
     AgentExecutor.cs
+    OrchestrationEngineer.cs
+    HttpAgentCapacityClient.cs
     PromptDecomposer.cs
   Tools/
     RaleLoopTools.cs
+    RaleOrchestrationTools.cs
     RaleDtos.cs
 tests/RALE.Tests/
 images/
@@ -70,14 +78,23 @@ skills/RALE/SKILL.md
 | `rale_complete_goal` | Persist a result, complete a goal, and emit dependent goals. |
 | `rale_pause_goal` | Pause a pending or in-progress goal. |
 | `rale_resume_goal` | Resume a paused goal and re-emit when ready. |
+| `rale_register_agent` | Register an agent card with capabilities, capacity, trust, task types, endpoint, and tool scopes. |
+| `rale_list_agents` | List registered agents with load and cached capacity metadata. |
+| `rale_discover_agent_capacity` | Query live agent capacity and fall back to cached/profile capacity when needed. |
+| `rale_create_master_plan` | Create a capacity-fit multi-agent plan with serial or parallel dependencies and governance metadata. |
+| `rale_assign_next_task` | Assign the next ready task for an agent while enforcing load, dependency, policy, and approval gates. |
+| `rale_approve_goal` | Approve or reject a goal blocked by a human approval gate. |
+| `rale_record_goal_heartbeat` | Persist execution heartbeat/provenance for long-running agent loops. |
+| `rale_resplit_goal` | Replace a capacity-mismatched goal with smaller dependency-preserving subtasks. |
 
 ## Database Schema
 
 SQLite tables:
 
-- `Loops`: primary objective, status, token limit, optimistic version.
-- `Goals`: sequence, description, bounded prompt, JSON dependencies, status, optimistic version.
-- `Agents`: agent name, JSON capabilities, optional assigned goal.
+- `Loops`: primary objective, status, token limit, execution pattern, constraints, artifacts, priority, deadline, iteration limit, optimistic version.
+- `Goals`: sequence, description, bounded prompt, JSON dependencies, assigned agent, task type, artifacts, approval state, policy state, retry and iteration limits, status, optimistic version.
+- `Agents`: agent card metadata, endpoint, current load, trust level, tool scopes, capacity cache, optional assigned goal.
+- `AgentEvents`: append-only audit trail for registration, capacity discovery, and capacity fallback.
 - `GoalResults`: output, JSON metadata, completion time.
 - `LoopEvents`: append-only audit trail for loop and goal transitions.
 
@@ -169,3 +186,6 @@ dotnet test ReactiveAgenticLoopEngineer.slnx -c Debug --results-directory TestRe
 - Keep `tokenLimit` conservative. RALE currently treats the limit as a character ceiling and exposes `EstimateTokens` for a conservative 4-chars-per-token estimate.
 - Subscribers may receive the same pending goal event more than once; executors must claim before executing. Only one claim succeeds.
 - Persisted results and loop events allow crash recovery and audit inspection.
+- Register agents before creating a master plan. RALE requests live capacity from `GET /agents/{id}/capacity?taskProfile=...` when an endpoint is configured, then falls back to fresh cached capacity or the registered profile.
+- Use `rale_create_master_plan` for multi-agent work. It stores policy violations on each generated goal and blocks assignment until `rale_approve_goal` clears human approval gates.
+- Use `rale_record_goal_heartbeat` for long-running agent loops and `rale_resplit_goal` when an agent reports capacity mismatch. Re-splitting is bounded by each goal's iteration limit.

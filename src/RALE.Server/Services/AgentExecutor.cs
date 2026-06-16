@@ -32,7 +32,7 @@ public sealed class DeterministicAgentToolClient : IAgentToolClient
     }
 }
 
-public sealed class AgentExecutor(
+public sealed partial class AgentExecutor(
     ILoopEngineer loopEngineer,
     IAgentToolClient toolClient,
     ILogger<AgentExecutor> logger) : IAgentExecutor
@@ -43,7 +43,7 @@ public sealed class AgentExecutor(
 
         if (!await loopEngineer.TryClaimGoalAsync(goal.Id, cancellationToken).ConfigureAwait(false))
         {
-            logger.LogDebug("Goal {GoalId} was not claimed; another executor may already own it.", goal.Id);
+            GoalNotClaimed(logger, goal.Id);
             return null;
         }
 
@@ -60,4 +60,7 @@ public sealed class AgentExecutor(
             throw;
         }
     }
+
+    [LoggerMessage(EventId = 1, Level = LogLevel.Debug, Message = "Goal {GoalId} was not claimed; another executor may already own it.")]
+    private static partial void GoalNotClaimed(ILogger logger, Guid goalId);
 }

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace RALE.Server.Data;
 
-public sealed class RaleDatabaseInitializer(
+public sealed partial class RaleDatabaseInitializer(
     IDbContextFactory<RALEContext> contextFactory,
     ILogger<RaleDatabaseInitializer> logger) : IHostedService
 {
@@ -12,8 +12,11 @@ public sealed class RaleDatabaseInitializer(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await context.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
-        logger.LogInformation("RALE database schema is current.");
+        DatabaseSchemaCurrent(logger);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(EventId = 1, Level = LogLevel.Information, Message = "RALE database schema is current.")]
+    private static partial void DatabaseSchemaCurrent(ILogger logger);
 }

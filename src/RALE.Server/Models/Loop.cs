@@ -12,6 +12,18 @@ public sealed class Loop
 
     public int TokenLimit { get; set; }
 
+    public string ConstraintsJson { get; set; } = "{}";
+
+    public string RequiredArtifactsJson { get; set; } = "[]";
+
+    public int Priority { get; set; }
+
+    public DateTimeOffset? Deadline { get; set; }
+
+    public int IterationLimit { get; set; } = 3;
+
+    public string ExecutionPattern { get; set; } = "serial";
+
     public long Version { get; set; }
 
     public List<Goal> Goals { get; } = [];

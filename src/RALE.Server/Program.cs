@@ -29,6 +29,8 @@ var connectionString = builder.Configuration["ConnectionStrings:RALE"]
 
 builder.Services.AddDbContextFactory<RALEContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddSingleton<ILoopEngineer, LoopEngineer>();
+builder.Services.AddHttpClient<IAgentCapacityClient, HttpAgentCapacityClient>();
+builder.Services.AddSingleton<IOrchestrationEngineer, OrchestrationEngineer>();
 builder.Services.AddSingleton<IAgentToolClient, DeterministicAgentToolClient>();
 builder.Services.AddSingleton<IAgentExecutor, AgentExecutor>();
 builder.Services.AddHostedService<RaleDatabaseInitializer>();
