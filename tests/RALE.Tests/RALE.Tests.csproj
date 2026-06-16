@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.8.0" PrivateAssets="all" />
-    <PackageReference Include="TUnit" Version="1.55.2" />
+    <PackageReference Include="TUnit" Version="1.56.0" />
   </ItemGroup>
 
   <PropertyGroup>
