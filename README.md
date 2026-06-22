@@ -8,7 +8,7 @@
 
 Reactive Agentic Loop Engineer (RALE) is a production-oriented C# Model Context Protocol server scaffold for decomposing large prompts into persisted, goal-bounded work loops.
 
-The server uses .NET 10, `ModelContextProtocol` 1.4.0, `ReactiveUI.Primitives` 4.0.0, EF Core SQLite, and TUnit on Microsoft.Testing.Platform.
+The server uses .NET 10, `ModelContextProtocol` 1.4.0, `ReactiveUI.Primitives`, EF Core SQLite, and TUnit on Microsoft.Testing.Platform.
 
 ## Quick Install
 
@@ -58,11 +58,9 @@ src/RALE.Server/
     RaleDtos.cs
 tests/RALE.Tests/
 images/
-  rale-icon.png
   rale-image.ico
   rale-image.png
   rale-package-icon.png
-  rale-logo.png
 .mcp/server.json
 skills/RALE/SKILL.md
 ```
