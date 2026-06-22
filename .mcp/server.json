@@ -3,13 +3,13 @@
   "name": "io.github.chrispulman/reactive-agentic-loop-engineer-mcp-server",
   "title": "Reactive Agentic Loop Engineer MCP Server",
   "description": "Reactive Agentic Loop Engineer is a .NET 10 MCP server for persisted prompt loops, goal-bounded decomposition, pause/resume workflows, and SQLite-backed audit state.",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "packages": [
     {
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "CP.Reactive.Agentic.Loop.Engineer.MCP.Server",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"
@@ -34,10 +34,10 @@
   },
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/ChrisPulman/ReactiveAgenticLoopEngineer/main/images/rale-icon.png",
+      "src": "https://raw.githubusercontent.com/ChrisPulman/ReactiveAgenticLoopEngineer/main/images/rale-package-icon.png",
       "mimeType": "image/png",
       "sizes": [
-        "1254x1254"
+        "512x512"
       ]
     }
   ]
