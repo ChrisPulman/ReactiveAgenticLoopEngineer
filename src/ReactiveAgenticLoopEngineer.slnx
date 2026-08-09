@@ -1,0 +1,27 @@
+<Solution>
+  <Folder Name="/Config/">
+    <File Path="../.editorconfig" />
+    <File Path="../.github/workflows/BuildDeploy.yml" />
+    <File Path="../.github/workflows/BuildOnly.yml" />
+    <File Path="../.gitignore" />
+    <File Path="../.mcp/server.json" />
+    <File Path="../.nuke/parameters.json" />
+    <File Path="../Directory.Build.props" />
+    <File Path="../Directory.Packages.props" />
+    <File Path="../global.json" />
+    <File Path="../images/rale-image.ico" />
+    <File Path="../images/rale-image.png" />
+    <File Path="../images/rale-package-icon.png" />
+    <File Path="../LICENSE" />
+    <File Path="../README.md" />
+    <File Path="../skills/RALE/SKILL.md" />
+    <File Path="../testconfig.json" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="RALE.Server/RALE.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="../tests/RALE.Tests/RALE.Tests.csproj" />
+  </Folder>
+  <Project Path="../build/_build.csproj" />
+</Solution>
