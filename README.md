@@ -6,9 +6,9 @@
 
 <!-- mcp-name: io.github.chrispulman/reactive-agentic-loop-engineer-mcp-server -->
 
-Reactive Agentic Loop Engineer (RALE) is a production-oriented C# Model Context Protocol server scaffold for decomposing large prompts into persisted, goal-bounded work loops.
+Reactive Agentic Loop Engineer (RALE) is a production-oriented C# Model Context Protocol server for decomposing large prompts into persisted, goal-bounded work loops that an agent can pause, resume, audit, and drive to completion.
 
-The server uses .NET 10, `ModelContextProtocol` 1.4.0, `ReactiveUI.Primitives`, EF Core SQLite, and TUnit on Microsoft.Testing.Platform.
+The server uses .NET 10, `ModelContextProtocol` 2.1.0, `ReactiveUI.Primitives`, EF Core SQLite, and TUnit on Microsoft.Testing.Platform.
 
 ## Quick Install
 
@@ -36,6 +36,17 @@ Click to install in your preferred environment:
 - MCP tools for loop creation, agent registration, capacity discovery, master-plan creation, dispatch, approval, completion, pause, resume, heartbeat, and re-splitting.
 - TUnit tests covering decomposition, persistence, ready-goal emission, claiming, completion, pause/resume, capacity fallback, governance, dispatch, and re-splitting.
 
+RALE persists orchestration state and exposes the lifecycle primitives used by an agent-side orchestrator. It does not currently run a hosted autonomous scheduler, expire heartbeats, retry failed work by itself, or execute arbitrary agent tools in the background. Retry limits, deadlines, constraints, and required artifacts remain visible in the persisted contract so the orchestrating agent can enforce them. RALE governance is auditable dispatch policy; it does not replace MCP host authentication, operating-system permissions, or user approval.
+
+## Required Companion MCP Servers for Codex
+
+A Codex autonomous workflow must configure these companion MCP servers alongside RALE:
+
+- `CP.ReactiveMemory.Mcp.Server` is the durable memory layer. Search it before planning, then store compact decisions and verified outcomes so later sessions, projects, chats, and resumed tasks can reuse them.
+- `CP.Reactive.Multi.Agent.MCP.Server` owns durable multi-agent sessions, specialist selection, named sub-agent lifecycle, checkpoints, results, heartbeats, and recovery policy.
+
+These are required companion MCP servers, not RALE in-process library references. Each package is an independently hosted .NET tool/MCP server. RALE remains the durable goal-loop and audit authority; Codex coordinates the three servers and retains responsibility for user authorization and tool safety.
+
 ## Repository Layout
 
 ```text
@@ -55,7 +66,10 @@ src/RALE.Server/
   Tools/
     RaleLoopTools.cs
     RaleOrchestrationTools.cs
-    RaleDtos.cs
+    LoopDto.cs
+    GoalDto.cs
+    AgentDto.cs
+    RaleDtoExtensions.cs
 tests/RALE.Tests/
 images/
   rale-image.ico
@@ -84,6 +98,14 @@ skills/RALE/SKILL.md
 | `rale_approve_goal` | Approve or reject a goal blocked by a human approval gate. |
 | `rale_record_goal_heartbeat` | Persist execution heartbeat/provenance for long-running agent loops. |
 | `rale_resplit_goal` | Replace a capacity-mismatched goal with smaller dependency-preserving subtasks. |
+
+### Autonomous Codex Workflow
+
+Search Reactive Memory first and resume an existing RALE loop when one exists. For a simple loop, inspect it and claim one ready goal before executing it. For a master plan, create or resume the corresponding Reactive Multi-Agent session, register the required agents, create the plan, and let each executor use `rale_assign_next_task`; do not mix assigned-task dispatch with `rale_claim_next_goal`.
+
+After each unit of work, persist a checkpoint or result, verify the required evidence, complete or pause the RALE goal, and inspect persisted state again. Continue this bounded loop until all required goals are terminal. Send heartbeats during long operations, re-split a goal when capacity is insufficient, and complete only verified work with concise artifact and test metadata. `tokenLimit` is a character ceiling, not a token budget, and RALE never overrides user approval or tool-permission requirements.
+
+Prefer local execution for local coordination. For example, an interval-based wait should use a bounded local timer or process monitor that reports progress and wakes the orchestrator for the next state inspection; it should not allocate an AI agent merely to sleep. Use sub-agents only for meaningful independent work and always close them after completion or failure.
 
 ## Database Schema
 
@@ -168,14 +190,22 @@ Override it with configuration key `ConnectionStrings:RALE`.
 ## Test
 
 ```powershell
-dotnet test ReactiveAgenticLoopEngineer.slnx -c Debug
+dotnet test --solution src/ReactiveAgenticLoopEngineer.slnx --configuration Debug
 ```
 
 Coverage with Microsoft.Testing.Platform:
 
 ```powershell
-dotnet test ReactiveAgenticLoopEngineer.slnx -c Debug --results-directory TestResults -- --coverage --coverage-output TestResults/coverage.cobertura.xml --coverage-output-format cobertura
+dotnet test --solution src/ReactiveAgenticLoopEngineer.slnx --configuration Debug --results-directory TestResults -- --coverage --coverage-output TestResults/coverage.cobertura.xml --coverage-output-format cobertura
 ```
+
+## CI and Release Bounds
+
+`BuildOnly.yml` runs the NUKE `Test` target once. Its local PowerShell monitor reports activity every 30 seconds, terminates the process tree after 20 minutes, and is contained by a 25-minute GitHub job timeout. `BuildDeploy.yml` gives build-and-pack the same 20-minute command limit inside a 30-minute release job; signing and NuGet publishing also have job and command bounds.
+
+Release jobs use the protected `release` environment. A job shown by GitHub as **Waiting for approval** has not entered the build command and is not a build hang; an authorized reviewer must approve the environment before its runner work can start.
+
+For a major release, CI derives the new major from the computed package version and rewrites exactly the three URL-encoded install references plus the one plain `dnx` reference in this README. It commits the resulting `major.*` update to the selected remote branch before packaging, then uses that new commit as the GitHub release/tag target. Major releases reject tag and SHA sources because those refs cannot safely persist the README update. Patch and minor releases leave the four references unchanged.
 
 ## Operational Notes
 
@@ -187,3 +217,5 @@ dotnet test ReactiveAgenticLoopEngineer.slnx -c Debug --results-directory TestRe
 - Register agents before creating a master plan. RALE requests live capacity from `GET /agents/{id}/capacity?taskProfile=...` when an endpoint is configured, then falls back to fresh cached capacity or the registered profile.
 - Use `rale_create_master_plan` for multi-agent work. It stores policy violations on each generated goal and blocks assignment until `rale_approve_goal` clears human approval gates.
 - Use `rale_record_goal_heartbeat` for long-running agent loops and `rale_resplit_goal` when an agent reports capacity mismatch. Re-splitting is bounded by each goal's iteration limit.
+- For Codex-driven autonomous work, use RALE as the persisted execution record, Reactive Memory for cross-session recall, and Reactive Multi-Agent for durable sub-agent orchestration. Inspect and claim or assign each ready goal before work, send heartbeats during long operations, and complete it only with verified output and concise artifact metadata.
+- Pause a goal before an intentional stop and resume from persisted state later. Heartbeats are liveness evidence, not automatic recovery; the agent-side orchestrator decides when policy permits retry, re-splitting, reassignment, or escalation.

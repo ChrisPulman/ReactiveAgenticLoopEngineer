@@ -1,43 +1,23 @@
-using System.Text.Json;
+// Copyright (c) 2023-2026 Chris Pulman and Contributors. All rights reserved.
+// Chris Pulman and Contributors licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for full license information.
+
 using Microsoft.Extensions.Logging;
 using RALE.Server.Models;
 
 namespace RALE.Server.Services;
 
-public interface IAgentExecutor
-{
-    Task<GoalResult?> Execute(Goal goal, CancellationToken cancellationToken = default);
-}
-
-public interface IAgentToolClient
-{
-    Task<AgentExecutionResult> ExecuteAsync(Goal goal, CancellationToken cancellationToken = default);
-}
-
-public sealed record AgentExecutionResult(string Output, string Metadata);
-
-public sealed class DeterministicAgentToolClient : IAgentToolClient
-{
-    public Task<AgentExecutionResult> ExecuteAsync(Goal goal, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(goal);
-
-        var metadata = JsonSerializer.Serialize(new
-        {
-            executor = nameof(DeterministicAgentToolClient),
-            promptLength = goal.Prompt.Length
-        });
-
-        return Task.FromResult(new AgentExecutionResult($"Executed goal {goal.Sequence}: {goal.Description}", metadata));
-    }
-}
-
+/// <summary>Coordinates goal claims with tool execution and completion recording.</summary>
+/// <param name="loopEngineer">The persisted loop lifecycle service.</param>
+/// <param name="toolClient">The client that executes claimed goal work.</param>
+/// <param name="logger">The logger used for claim diagnostics.</param>
 public sealed partial class AgentExecutor(
     ILoopEngineer loopEngineer,
     IAgentToolClient toolClient,
     ILogger<AgentExecutor> logger) : IAgentExecutor
 {
-    public async Task<GoalResult?> Execute(Goal goal, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async Task<GoalResult?> Execute(Goal goal, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(goal);
 
@@ -56,7 +36,7 @@ public sealed partial class AgentExecutor(
         }
         catch (Exception ex)
         {
-            await loopEngineer.FailGoalAsync(goal.Id, ex.Message, cancellationToken).ConfigureAwait(false);
+            _ = await loopEngineer.FailGoalAsync(goal.Id, ex.Message, cancellationToken).ConfigureAwait(false);
             throw;
         }
     }

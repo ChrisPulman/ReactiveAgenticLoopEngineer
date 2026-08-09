@@ -1,0 +1,66 @@
+name: BuildOnly
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-latest:
+    name: Bounded Windows build and test
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            global.json
+            **/*.csproj
+
+      - name: Build, test, and collect coverage
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath pwsh -ArgumentList @(
+            '-NoLogo', '-NoProfile', '-File', '.\build.ps1',
+            'Test', '--configuration', 'Release'
+          ) -NoNewWindow -PassThru
+          $deadline = [DateTimeOffset]::UtcNow.AddMinutes(20)
+          while (-not $process.HasExited) {
+            if ([DateTimeOffset]::UtcNow -ge $deadline) {
+              & taskkill.exe /PID $process.Id /T /F | Out-Host
+              throw 'Build and test exceeded the 20-minute command limit.'
+            }
+            Write-Host "Build and test is active (PID $($process.Id)); next check in 30 seconds."
+            Start-Sleep -Seconds 30
+          }
+          if ($process.ExitCode -ne 0) {
+            throw "Build and test failed with exit code $($process.ExitCode)."
+          }
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tmp-coverage
+          path: |
+            TestResults/*.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 3

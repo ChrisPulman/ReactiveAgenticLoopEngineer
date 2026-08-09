@@ -1,3 +1,7 @@
+// Copyright (c) 2023-2026 Chris Pulman and Contributors. All rights reserved.
+// Chris Pulman and Contributors licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for full license information.
+
 using System.ComponentModel;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -5,51 +9,60 @@ using RALE.Server.Services;
 
 namespace RALE.Server.Tools;
 
+/// <summary>Provides MCP tools for registering agents and orchestrating RALE master plans.</summary>
 [McpServerToolType]
 public static class RaleOrchestrationTools
 {
+    /// <summary>Defines the default capacity-cache lifetime.</summary>
+    private const int DefaultCapacityCacheTtlSeconds = 300;
+
+    /// <summary>Defines the default maximum reactive iteration count.</summary>
+    private const int DefaultIterationLimit = 3;
+
+    /// <summary>Registers an agent card for orchestration.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="request">The agent card to register.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The registered agent.</returns>
     [McpServerTool(Name = "rale_register_agent", Title = "Register RALE Agent", Destructive = false, OpenWorld = false)]
     [Description("Registers an agent card with capabilities, capacity profile, supported task types, trust posture, and least-privilege tool scopes.")]
     public static async Task<AgentDto> RegisterAgent(
         IOrchestrationEngineer orchestrationEngineer,
-        [Description("Human-readable unique agent name.")] string name,
-        [Description("Agent capabilities such as csharp, testing, docs, or mcp.")] string[] capabilities,
-        [Description("Agent HTTP endpoint used for on-demand capacity discovery.")] string? endpoint,
-        [Description("Maximum goals this agent may execute concurrently.")] int maxConcurrentGoals,
-        [Description("Fallback max prompt/context capacity for the agent.")] int maxTokenCapacity,
-        [Description("Task types the agent supports.")] string[] supportedTaskTypes,
-        [Description("Service-level objective or SLA description.")] string? sla,
-        [Description("Security posture such as unverified, verified, or trusted.")] string? securityPosture,
-        [Description("Trust level from 0 to 100 used by approval gates.")] int trustLevel,
-        [Description("Least-privilege tool scopes the agent may use.")] string[] toolScopes,
-        [Description("Seconds before cached capacity expires.")] int capacityCacheTtlSeconds,
+        [Description("Agent card containing identity, capacity, task support, trust posture, and tool scopes.")] RegisterAgentRequest request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(orchestrationEngineer);
+        ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(request.Name))
         {
             throw new McpException("name is required.");
         }
 
         var agent = await orchestrationEngineer.RegisterAgentAsync(
-            new AgentCard(
-                name,
-                capabilities ?? [],
-                endpoint ?? string.Empty,
-                maxConcurrentGoals,
-                maxTokenCapacity,
-                supportedTaskTypes ?? [],
-                sla ?? string.Empty,
-                securityPosture ?? "unverified",
-                trustLevel,
-                toolScopes ?? [],
-                capacityCacheTtlSeconds <= 0 ? 300 : capacityCacheTtlSeconds),
+            new AgentCard
+            {
+                Name = request.Name,
+                Capabilities = request.Capabilities ?? [],
+                Endpoint = request.Endpoint ?? string.Empty,
+                MaxConcurrentGoals = request.MaxConcurrentGoals,
+                MaxTokenCapacity = request.MaxTokenCapacity,
+                SupportedTaskTypes = request.SupportedTaskTypes ?? [],
+                Sla = request.Sla ?? string.Empty,
+                SecurityPosture = request.SecurityPosture ?? "unverified",
+                TrustLevel = request.TrustLevel,
+                ToolScopes = request.ToolScopes ?? [],
+                CapacityCacheTtlSeconds = request.CapacityCacheTtlSeconds <= 0 ? DefaultCapacityCacheTtlSeconds : request.CapacityCacheTtlSeconds,
+            },
             cancellationToken).ConfigureAwait(false);
 
         return agent.ToDto();
     }
 
+    /// <summary>Lists registered agent cards.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The registered agents.</returns>
     [McpServerTool(Name = "rale_list_agents", Title = "List RALE Agents", ReadOnly = true, Destructive = false, OpenWorld = false)]
     [Description("Lists registered agent cards with load, capacity cache, trust, and tool-scope metadata.")]
     public static async Task<IReadOnlyList<AgentDto>> ListAgents(
@@ -59,9 +72,21 @@ public static class RaleOrchestrationTools
         ArgumentNullException.ThrowIfNull(orchestrationEngineer);
 
         var agents = await orchestrationEngineer.ListAgentsAsync(cancellationToken).ConfigureAwait(false);
-        return [.. agents.Select(agent => agent.ToDto())];
+        var agentDtos = new AgentDto[agents.Count];
+        for (var index = 0; index < agents.Count; index++)
+        {
+            agentDtos[index] = agents[index].ToDto();
+        }
+
+        return agentDtos;
     }
 
+    /// <summary>Discovers task-specific capacity for an agent.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="agentId">The agent identifier.</param>
+    /// <param name="taskProfile">The task profile used for discovery.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The discovered capacity observation.</returns>
     [McpServerTool(Name = "rale_discover_agent_capacity", Title = "Discover RALE Agent Capacity", Destructive = false, OpenWorld = true)]
     [Description("Queries an agent endpoint for task-specific capacity, falling back to a fresh cached profile or the registered profile when needed.")]
     public static async Task<AgentCapacityDto> DiscoverAgentCapacity(
@@ -76,59 +101,44 @@ public static class RaleOrchestrationTools
         return capacity.ToDto();
     }
 
+    /// <summary>Creates a persisted master plan and assigns capacity-fit subtasks.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="request">The objective, candidate agents, execution policy, and governance metadata.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The created master-plan loop.</returns>
     [McpServerTool(Name = "rale_create_master_plan", Title = "Create RALE Master Plan", Destructive = false, OpenWorld = false)]
     [Description("Creates a persisted master-plan loop, discovers agent capacities, splits the plan into capacity-fit subtasks, and records dependency and governance metadata.")]
     public static async Task<LoopDto> CreateMasterPlan(
         IOrchestrationEngineer orchestrationEngineer,
-        [Description("Master plan or primary objective to decompose.")] string primaryObjective,
-        [Description("Candidate agent ids for assignment.")] Guid[] agentIds,
-        [Description("Maximum character length allowed for any emitted subtask prompt.")] int tokenLimit,
-        [Description("Task type used for capability and capacity matching.")] string? taskType,
-        [Description("Execution pattern: serial or parallel.")] string? executionPattern,
-        [Description("Required artifact names or categories.")] string[] requiredArtifacts,
-        [Description("JSON constraints object for the plan.")] string? constraintsJson,
-        [Description("Plan priority. Higher values dispatch first.")] int priority,
-        [Description("Optional deadline for all subtasks.")] DateTimeOffset? deadline,
-        [Description("Whether every generated task requires human approval before dispatch.")] bool approvalRequired,
-        [Description("Minimum trust level before a task may dispatch without approval.")] int minTrustLevel,
-        [Description("Tool scopes required by the plan.")] string[] toolScopes,
-        [Description("Maximum reactive loop iterations before approval is required.")] int iterationLimit,
-        [Description("Retry limit stored with each task.")] int retryLimit,
+        [Description("Master-plan objective, agent candidates, execution policy, constraints, and governance metadata.")] CreateMasterPlanToolRequest request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(orchestrationEngineer);
+        ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(primaryObjective))
+        if (string.IsNullOrWhiteSpace(request.PrimaryObjective))
         {
             throw new McpException("primaryObjective is required.");
         }
 
-        if (agentIds is null || agentIds.Length == 0)
+        if (request.AgentIds is null || request.AgentIds.Length == 0)
         {
             throw new McpException("agentIds must contain at least one agent id.");
         }
 
         var loop = await orchestrationEngineer.CreateMasterPlanAsync(
-            new MasterPlanRequest(
-                primaryObjective,
-                agentIds,
-                tokenLimit,
-                string.IsNullOrWhiteSpace(taskType) ? "general" : taskType.Trim(),
-                string.IsNullOrWhiteSpace(executionPattern) ? "serial" : executionPattern.Trim(),
-                requiredArtifacts ?? [],
-                string.IsNullOrWhiteSpace(constraintsJson) ? "{}" : constraintsJson.Trim(),
-                priority,
-                deadline,
-                approvalRequired,
-                minTrustLevel,
-                toolScopes ?? [],
-                iterationLimit <= 0 ? 3 : iterationLimit,
-                retryLimit < 0 ? 0 : retryLimit),
+            CreateMasterPlanRequest(request),
             cancellationToken).ConfigureAwait(false);
 
         return loop.ToDto();
     }
 
+    /// <summary>Assigns the next ready task to a specific agent.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="loopId">The task graph's loop identifier.</param>
+    /// <param name="agentId">The requesting agent identifier.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The assigned goal, or <see langword="null"/> when none is ready.</returns>
     [McpServerTool(Name = "rale_assign_next_task", Title = "Assign Next RALE Task", Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Assigns the next ready task for a specific agent, enforcing dependencies, load, policy, and approval gates.")]
     public static async Task<GoalDto?> AssignNextTask(
@@ -143,6 +153,13 @@ public static class RaleOrchestrationTools
         return goal?.ToDto();
     }
 
+    /// <summary>Approves or rejects a goal blocked by a human approval gate.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="goalId">The goal identifier.</param>
+    /// <param name="approved">Whether to approve the goal.</param>
+    /// <param name="reviewer">The reviewer name recorded in the audit trail.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The updated goal, or <see langword="null"/> when it does not exist.</returns>
     [McpServerTool(Name = "rale_approve_goal", Title = "Approve RALE Goal", Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Approves or rejects a goal that is blocked by a human approval gate.")]
     public static async Task<GoalDto?> ApproveGoal(
@@ -158,6 +175,12 @@ public static class RaleOrchestrationTools
         return goal?.ToDto();
     }
 
+    /// <summary>Records executor progress for a goal.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="goalId">The goal identifier.</param>
+    /// <param name="detail">Optional execution detail to record.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The updated goal, or <see langword="null"/> when it does not exist.</returns>
     [McpServerTool(Name = "rale_record_goal_heartbeat", Title = "Record RALE Goal Heartbeat", Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Records an execution heartbeat for a goal so long-running agent loops remain observable.")]
     public static async Task<GoalDto?> RecordGoalHeartbeat(
@@ -172,6 +195,13 @@ public static class RaleOrchestrationTools
         return goal?.ToDto();
     }
 
+    /// <summary>Splits a goal into smaller replacement tasks.</summary>
+    /// <param name="orchestrationEngineer">The orchestration service.</param>
+    /// <param name="goalId">The goal identifier.</param>
+    /// <param name="reason">The audit reason for the split.</param>
+    /// <param name="capacityLimit">An optional replacement prompt limit.</param>
+    /// <param name="cancellationToken">A token that cancels the operation.</param>
+    /// <returns>The replacement goals.</returns>
     [McpServerTool(Name = "rale_resplit_goal", Title = "Re-split RALE Goal", Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Re-splits a goal into smaller replacement tasks after capacity mismatch or bounded loop failure, preserving dependency handoff.")]
     public static async Task<IReadOnlyList<GoalDto>> ResplitGoal(
@@ -184,6 +214,33 @@ public static class RaleOrchestrationTools
         ArgumentNullException.ThrowIfNull(orchestrationEngineer);
 
         var goals = await orchestrationEngineer.ResplitGoalAsync(goalId, reason ?? "capacity mismatch", capacityLimit, cancellationToken).ConfigureAwait(false);
-        return [.. goals.Select(goal => goal.ToDto())];
+        var goalDtos = new GoalDto[goals.Count];
+        for (var index = 0; index < goals.Count; index++)
+        {
+            goalDtos[index] = goals[index].ToDto();
+        }
+
+        return goalDtos;
     }
+
+    /// <summary>Maps a tool request to the required master-plan request.</summary>
+    /// <param name="request">The tool request to map.</param>
+    /// <returns>The normalized master-plan request.</returns>
+    private static MasterPlanRequest CreateMasterPlanRequest(CreateMasterPlanToolRequest request) => new()
+    {
+        PrimaryObjective = request.PrimaryObjective,
+        AgentIds = request.AgentIds,
+        TokenLimit = request.TokenLimit,
+        TaskType = string.IsNullOrWhiteSpace(request.TaskType) ? "general" : request.TaskType.Trim(),
+        ExecutionPattern = string.IsNullOrWhiteSpace(request.ExecutionPattern) ? "serial" : request.ExecutionPattern.Trim(),
+        RequiredArtifacts = request.RequiredArtifacts ?? [],
+        ConstraintsJson = string.IsNullOrWhiteSpace(request.ConstraintsJson) ? "{}" : request.ConstraintsJson.Trim(),
+        Priority = request.Priority,
+        Deadline = request.Deadline,
+        ApprovalRequired = request.ApprovalRequired,
+        MinTrustLevel = request.MinTrustLevel,
+        ToolScopes = request.ToolScopes ?? [],
+        IterationLimit = request.IterationLimit <= 0 ? DefaultIterationLimit : request.IterationLimit,
+        RetryLimit = request.RetryLimit < 0 ? 0 : request.RetryLimit,
+    };
 }
