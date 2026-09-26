@@ -77,11 +77,14 @@ public sealed partial class MultiAgentOrchestration : Migration
             nullable: false,
             defaultValue: "NotRequired");
 
-        migrationBuilder.AddColumn<Guid>(
-            name: "AssignedAgentId",
-            table: "Goals",
-            type: "TEXT",
-            nullable: true);
+        // SQLite cannot add a foreign key to an existing table, and EF Core can only rebuild the table when the
+        // migration carries a target model. ALTER TABLE ADD COLUMN accepts a REFERENCES clause for a nullable column,
+        // so the column and its FK_Goals_Agents_AssignedAgentId constraint are created together.
+        migrationBuilder.Sql(
+            """
+            ALTER TABLE "Goals" ADD COLUMN "AssignedAgentId" TEXT NULL
+                CONSTRAINT "FK_Goals_Agents_AssignedAgentId" REFERENCES "Agents" ("Id") ON DELETE SET NULL;
+            """);
 
         migrationBuilder.AddColumn<DateTimeOffset>(
             name: "Deadline",
@@ -295,14 +298,6 @@ public sealed partial class MultiAgentOrchestration : Migration
             name: "IX_Goals_AssignedAgentId",
             table: "Goals",
             column: "AssignedAgentId");
-
-        migrationBuilder.AddForeignKey(
-            name: "FK_Goals_Agents_AssignedAgentId",
-            table: "Goals",
-            column: "AssignedAgentId",
-            principalTable: "Agents",
-            principalColumn: "Id",
-            onDelete: ReferentialAction.SetNull);
     }
 
     /// <inheritdoc />
@@ -310,46 +305,48 @@ public sealed partial class MultiAgentOrchestration : Migration
     {
         ArgumentNullException.ThrowIfNull(migrationBuilder);
 
-        migrationBuilder.DropForeignKey(name: "FK_Goals_Agents_AssignedAgentId", table: "Goals");
+        // EF Core can only generate DropForeignKey/DropColumn for SQLite by rebuilding the table from a migration
+        // target model, which these hand-written migrations do not carry. SQLite 3.35+ drops columns natively, and
+        // dropping AssignedAgentId also removes FK_Goals_Agents_AssignedAgentId because it is declared on that column.
         migrationBuilder.DropTable(name: "AgentEvents");
         migrationBuilder.DropIndex(name: "IX_Goals_AssignedAgentId", table: "Goals");
 
-        migrationBuilder.DropColumn(name: "ConstraintsJson", table: "Loops");
-        migrationBuilder.DropColumn(name: "Deadline", table: "Loops");
-        migrationBuilder.DropColumn(name: "ExecutionPattern", table: "Loops");
-        migrationBuilder.DropColumn(name: "IterationLimit", table: "Loops");
-        migrationBuilder.DropColumn(name: "Priority", table: "Loops");
-        migrationBuilder.DropColumn(name: "RequiredArtifactsJson", table: "Loops");
+        migrationBuilder.Sql("""ALTER TABLE "Loops" DROP COLUMN "ConstraintsJson";""");
+        migrationBuilder.Sql("""ALTER TABLE "Loops" DROP COLUMN "Deadline";""");
+        migrationBuilder.Sql("""ALTER TABLE "Loops" DROP COLUMN "ExecutionPattern";""");
+        migrationBuilder.Sql("""ALTER TABLE "Loops" DROP COLUMN "IterationLimit";""");
+        migrationBuilder.Sql("""ALTER TABLE "Loops" DROP COLUMN "Priority";""");
+        migrationBuilder.Sql("""ALTER TABLE "Loops" DROP COLUMN "RequiredArtifactsJson";""");
 
-        migrationBuilder.DropColumn(name: "ApprovalRequired", table: "Goals");
-        migrationBuilder.DropColumn(name: "ApprovalState", table: "Goals");
-        migrationBuilder.DropColumn(name: "AssignedAgentId", table: "Goals");
-        migrationBuilder.DropColumn(name: "Deadline", table: "Goals");
-        migrationBuilder.DropColumn(name: "IterationCount", table: "Goals");
-        migrationBuilder.DropColumn(name: "IterationLimit", table: "Goals");
-        migrationBuilder.DropColumn(name: "LastHeartbeatAt", table: "Goals");
-        migrationBuilder.DropColumn(name: "PolicyState", table: "Goals");
-        migrationBuilder.DropColumn(name: "PolicyViolationsJson", table: "Goals");
-        migrationBuilder.DropColumn(name: "Priority", table: "Goals");
-        migrationBuilder.DropColumn(name: "RequiredArtifactsJson", table: "Goals");
-        migrationBuilder.DropColumn(name: "RetryCount", table: "Goals");
-        migrationBuilder.DropColumn(name: "RetryLimit", table: "Goals");
-        migrationBuilder.DropColumn(name: "TaskType", table: "Goals");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "ApprovalRequired";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "ApprovalState";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "AssignedAgentId";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "Deadline";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "IterationCount";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "IterationLimit";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "LastHeartbeatAt";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "PolicyState";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "PolicyViolationsJson";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "Priority";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "RequiredArtifactsJson";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "RetryCount";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "RetryLimit";""");
+        migrationBuilder.Sql("""ALTER TABLE "Goals" DROP COLUMN "TaskType";""");
 
-        migrationBuilder.DropColumn(name: "CachedCapacity", table: "Agents");
-        migrationBuilder.DropColumn(name: "CachedCapacityConstraintsJson", table: "Agents");
-        migrationBuilder.DropColumn(name: "CapacityCacheTtlSeconds", table: "Agents");
-        migrationBuilder.DropColumn(name: "CapacityCheckedAt", table: "Agents");
-        migrationBuilder.DropColumn(name: "CapacityExpiresAt", table: "Agents");
-        migrationBuilder.DropColumn(name: "CurrentLoad", table: "Agents");
-        migrationBuilder.DropColumn(name: "Endpoint", table: "Agents");
-        migrationBuilder.DropColumn(name: "MaxConcurrentGoals", table: "Agents");
-        migrationBuilder.DropColumn(name: "MaxTokenCapacity", table: "Agents");
-        migrationBuilder.DropColumn(name: "SecurityPosture", table: "Agents");
-        migrationBuilder.DropColumn(name: "Sla", table: "Agents");
-        migrationBuilder.DropColumn(name: "SupportedTaskTypesJson", table: "Agents");
-        migrationBuilder.DropColumn(name: "ToolScopesJson", table: "Agents");
-        migrationBuilder.DropColumn(name: "TrustLevel", table: "Agents");
-        migrationBuilder.DropColumn(name: "Version", table: "Agents");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "CachedCapacity";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "CachedCapacityConstraintsJson";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "CapacityCacheTtlSeconds";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "CapacityCheckedAt";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "CapacityExpiresAt";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "CurrentLoad";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "Endpoint";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "MaxConcurrentGoals";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "MaxTokenCapacity";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "SecurityPosture";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "Sla";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "SupportedTaskTypesJson";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "ToolScopesJson";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "TrustLevel";""");
+        migrationBuilder.Sql("""ALTER TABLE "Agents" DROP COLUMN "Version";""");
     }
 }
